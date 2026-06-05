@@ -1,0 +1,5 @@
+pyspark
+delta-spark
+yfinance
+pandas
+pyyaml

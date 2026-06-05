@@ -1,0 +1,6 @@
+ticker,company_name,sector,country,asset_class,currency
+AAPL,Apple Inc,Technology,USA,Equity,USD
+MSFT,Microsoft,Technology,USA,Equity,USD
+NVDA,Nvidia,Technology,USA,Equity,USD
+SAP,SAP SE,Technology,Germany,Equity,EUR
+ALV.DE,Allianz,Financials,Germany,Equity,EUR
