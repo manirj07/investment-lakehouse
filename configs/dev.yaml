@@ -1,0 +1,17 @@
+storage:
+  account_name: stinvestmentlakehouse
+  container: investment-lakehouse
+
+paths:
+  bronze_market_prices: bronze/market_prices
+  bronze_holdings: bronze/holdings
+  bronze_esg: bronze/esg
+  bronze_security_master: bronze/security_master
+
+market_data:
+  tickers:
+    - AAPL
+    - MSFT
+    - NVDA
+    - SAP
+    - ALV.DE
