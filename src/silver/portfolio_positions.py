@@ -1,3 +1,6 @@
+def run():
+    print("Running portfolio_positions")
+
 # Databricks notebook source
 from pyspark.sql import functions as f
 from pyspark.sql.window import Window

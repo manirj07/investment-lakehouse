@@ -1,3 +1,6 @@
+def run():
+    print("Running esg_scores_ingestion")
+
 # Databricks notebook source
 esg_data = [
     ("AAPL", 80, 75, 85),

@@ -1,3 +1,6 @@
+def run():
+    print("Running performance_attribution")
+
 # Databricks notebook source
 from pyspark.sql import functions as F
 

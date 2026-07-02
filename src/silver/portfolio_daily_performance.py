@@ -1,3 +1,6 @@
+def run():
+    print("Running portfolio_daily_performance")
+
 # Databricks notebook source
 from pyspark.sql import functions as F
 
