@@ -1,3 +1,6 @@
+def run():
+    print("Running portfolio_esg_score")
+
 # Databricks notebook source
 weights_df = spark.table(
     "adb_investment_platform_dev.investment_silver.portfolio_weights"

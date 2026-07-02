@@ -1,3 +1,6 @@
+def run():
+    print("Running daily_returns")
+
 # Databricks notebook source
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window

@@ -1,3 +1,6 @@
+def run():
+    print("Running dim_portfolio")
+
 # Databricks notebook source
 portfolio_data = [
     (

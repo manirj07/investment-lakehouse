@@ -1,3 +1,6 @@
+def run():
+    print("Running fact_performance_attribution")
+
 # Databricks notebook source
 performance_attribution_df = spark.table(
     "adb_investment_platform_dev.investment_silver.performance_attribution"

@@ -1,3 +1,6 @@
+def run():
+    print("Running security_master_ingestion")
+
 # Databricks notebook source
 security_master = [
     ("AAPL", "Apple Inc", "Technology", "USA", "USD"),

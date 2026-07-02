@@ -1,3 +1,6 @@
+def run():
+    print("Running sector_exposure")
+
 # Databricks notebook source
 from pyspark.sql import functions as F
 

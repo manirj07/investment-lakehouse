@@ -1,3 +1,6 @@
+def run():
+    print("Running portfolio_weights")
+
 # Databricks notebook source
 positions_df = spark.table(
     "adb_investment_platform_dev.investment_silver.portfolio_positions"

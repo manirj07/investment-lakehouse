@@ -1,3 +1,6 @@
+def run():
+    print("Running holdings_ingestion")
+
 # Databricks notebook source
 holdings = [
     ("P001", "AAPL", 100),

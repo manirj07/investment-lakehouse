@@ -1,3 +1,6 @@
+def run():
+    print("Running country_exposure")
+
 # Databricks notebook source
 from pyspark.sql import functions as F
 

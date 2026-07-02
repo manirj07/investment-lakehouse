@@ -1,3 +1,6 @@
+def run():
+    print("Running fact_portfolio_daily_performance")
+
 # Databricks notebook source
 portfolio_daily_performance_df = spark.table(
     "adb_investment_platform_dev.investment_silver.portfolio_daily_performance"
