@@ -1,81 +1,38 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import col, sum, round
+
 def run():
-    print("Running portfolio_esg_score")
 
-# Databricks notebook source
-weights_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_weights"
-)
+    spark = get_spark()
 
-esg_df = spark.table(
-    "adb_investment_platform_dev.investment_bronze.esg_scores"
-)
-
-# COMMAND ----------
-
-portfolio_esg_df = (
-    weights_df.alias("w")
-    .join(
-        esg_df.alias("e"),
-        on="ticker",
-        how="inner"
+    weights_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_weights"
     )
-)
 
-# COMMAND ----------
+    esg_df = spark.read.format("delta").load(
+        "/opt/data/bronze/esg_scores"
+    )
 
-# MAGIC %md
-# MAGIC Calculate Weighted ESG Contribution
-
-# COMMAND ----------
-
-from pyspark.sql import functions as F
-
-portfolio_esg_df = (
-    portfolio_esg_df
-    .withColumn(
-        "weighted_esg",
-        F.round(
-            (
-                F.col("weight_pct")
-                * F.col("esg_score")
-            ) / 100,
-            4
+    result_df = (
+        weights_df
+        .join(esg_df, "ticker")
+        .withColumn(
+            "weighted_score",
+            col("weight_pct") * col("esg_score")
+        )
+        .groupBy("portfolio_id")
+        .agg(
+            round(
+                sum("weighted_score") / 100,
+                2
+            ).alias("portfolio_esg_score")
         )
     )
-)
 
-# COMMAND ----------
+    result_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/silver/portfolio_esg_score")
 
-# MAGIC %md
-# MAGIC Portfolio ESG Score
-
-# COMMAND ----------
-
-portfolio_esg_score_df = (
-    portfolio_esg_df
-    .groupBy("portfolio_id")
-    .agg(
-        F.round(
-            F.sum("weighted_esg"),
-            2
-        ).alias("portfolio_esg_score")
-    )
-)
-
-# COMMAND ----------
-
-portfolio_esg_score_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.portfolio_esg_score"
-    )
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_silver.portfolio_esg_score;
-
-# COMMAND ----------
-
+if __name__ == "__main__":
+    run()

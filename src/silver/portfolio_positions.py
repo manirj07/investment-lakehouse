@@ -1,50 +1,88 @@
-def run():
-    print("Running portfolio_positions")
-
-# Databricks notebook source
-from pyspark.sql import functions as f
+from common.spark_session import get_spark
 from pyspark.sql.window import Window
+from pyspark.sql.functions import (
+    row_number,
+    col,
+    round
+)
 
-market_price_df = spark.table("adb_investment_platform_dev.investment_bronze.market_prices")
-holdings_df = spark.table("adb_investment_platform_dev.investment_bronze.holdings")
+def run():
 
-# COMMAND ----------
+    spark = get_spark()
 
-# DBTITLE 1,Cell 2
-window_spec = Window.partitionBy("ticker") \
-                    .orderBy(f.col("date").desc())
-
-latest_prices_df =  (market_price_df.withColumn("row_num", f.row_number().over(window_spec))
-                     .filter(f.col("row_num") == 1)
-                     .drop("row_num"))
-
-
-# COMMAND ----------
-
-latest_prices_df.select(
-    "ticker",
-    "date",
-    "close"
-).show()
-
-# COMMAND ----------
-
-postfolio_positions_df = (holdings_df.alias("h").join(latest_prices_df.alias("p"), on ="ticker", how = "inner"))
-
-
-# COMMAND ----------
-
-portfolio_positions_df = (postfolio_positions_df.withColumn("market_value",f.round(f.col("shares") * f.col("close"),2)) \
-    .withColumn("load_timestamp",f.current_timestamp()))
-
-# COMMAND ----------
-
-portfolio_positions_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.portfolio_positions"
+    holdings_df = spark.read.format("delta").load(
+        "/opt/data/bronze/holdings"
     )
 
-# COMMAND ----------
+    prices_df = spark.read.format("delta").load(
+        "/opt/data/bronze/market_prices"
+    )
 
+    latest_price_window = Window.partitionBy(
+        "ticker"
+    ).orderBy(
+        col("date").desc()
+    )
+
+    latest_prices_df = (
+        prices_df
+        .withColumn(
+            "rn",
+            row_number().over(latest_price_window)
+        )
+        .filter(col("rn") == 1)
+        .select(
+            "ticker",
+            col("close").alias("latest_price")
+        )
+    )
+
+    portfolio_df = (
+        holdings_df
+        .join(
+            latest_prices_df,
+            "ticker",
+            "inner"
+        )
+        .withColumn(
+            "market_value",
+            col("quantity").cast("double")
+            * col("latest_price")
+        )
+        .withColumn(
+            "cost_basis",
+            col("quantity").cast("double")
+            * col("purchase_price").cast("double")
+        )
+        .withColumn(
+            "unrealized_pnl",
+            col("market_value")
+            - col("cost_basis")
+        )
+    )
+
+    portfolio_df = (
+        portfolio_df
+        .withColumn(
+            "market_value",
+            round("market_value", 2)
+        )
+        .withColumn(
+            "cost_basis",
+            round("cost_basis", 2)
+        )
+        .withColumn(
+            "unrealized_pnl",
+            round("unrealized_pnl", 2)
+        )
+    )
+
+    portfolio_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/silver/portfolio_positions")
+
+    print("Portfolio positions created")
+
+if __name__ == "__main__":
+    run()

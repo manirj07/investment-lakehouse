@@ -1,90 +1,63 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import (
+    col,
+    sum,
+    round
+)
+
 def run():
-    print("Running portfolio_daily_performance")
 
-# Databricks notebook source
-from pyspark.sql import functions as F
+    spark = get_spark()
 
-returns_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.daily_returns"
-)
-
-weights_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_weights"
-)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC join returns with weights
-
-# COMMAND ----------
-
-portfolio_returns_df = (
-    returns_df.alias("r")
-    .join(
-        weights_df.select(
-            "portfolio_id",
-            "ticker",
-            "weight_pct"
-        ).alias("w"),
-        on="ticker",
-        how="inner"
+    returns_df = spark.read.format("delta").load(
+        "/opt/data/silver/daily_returns"
     )
-)
 
-# COMMAND ----------
+    weights_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_weights"
+    )
 
-portfolio_returns_df = (
-    portfolio_returns_df
-    .withColumn(
-        "contribution_pct",
-        F.round(
+    portfolio_returns_df = (
+        returns_df
+        .join(
+            weights_df.select(
+                "portfolio_id",
+                "ticker",
+                "weight_pct"
+            ),
+            "ticker"
+        )
+        .withColumn(
+            "contribution_pct",
             (
-                F.col("weight_pct")
-                * F.col("daily_return_pct")
-            ) / 100,
-            6
+                col("daily_return_pct")
+                * col("weight_pct")
+            ) / 100
+        )
+        .groupBy(
+            "portfolio_id",
+            "date"
+        )
+        .agg(
+            round(
+                sum("contribution_pct"),
+                4
+            ).alias(
+                "portfolio_return_pct"
+            )
         )
     )
-)
 
-# COMMAND ----------
+    portfolio_returns_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save(
+            "/opt/data/silver/portfolio_daily_performance"
+        )
 
-# MAGIC %md
-# MAGIC Aggregate To Portfolio Level
-
-# COMMAND ----------
-
-portfolio_daily_performance_df = (
-    portfolio_returns_df
-    .groupBy(
-        "portfolio_id",
-        "date"
-    )
-    .agg(
-        F.round(
-            F.sum("contribution_pct"),
-            6
-        ).alias("portfolio_return_pct")
-    )
-)
-
-# COMMAND ----------
-
-portfolio_daily_performance_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.portfolio_daily_performance"
+    print(
+        "Portfolio daily performance created"
     )
 
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_silver.portfolio_daily_performance
-# MAGIC ORDER BY date
-# MAGIC LIMIT 10;
-
-# COMMAND ----------
-
+if __name__ == "__main__":
+    run()

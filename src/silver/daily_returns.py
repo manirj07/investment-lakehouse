@@ -1,78 +1,40 @@
-def run():
-    print("Running daily_returns")
-
-# Databricks notebook source
-from pyspark.sql import functions as F
+from common.spark_session import get_spark
 from pyspark.sql.window import Window
+from pyspark.sql.functions import lag, col
 
-market_prices_df = spark.table(
-    "adb_investment_platform_dev.investment_bronze.market_prices"
-)
 
-# COMMAND ----------
+def run():
 
-window_spec = (
-    Window
-    .partitionBy("ticker")
-    .orderBy("date")
-)
+    spark = get_spark()
 
-# COMMAND ----------
-
-returns_df = (
-    market_prices_df
-    .withColumn(
-        "previous_close",
-        F.lag("close").over(window_spec)
+    prices_df = spark.read.format("delta").load(
+        "/opt/data/bronze/market_prices"
     )
-)
 
-# COMMAND ----------
+    window_spec = Window.partitionBy("ticker").orderBy("date")
 
-returns_df = (
-    returns_df
-    .withColumn(
-        "daily_return_pct",
-        F.round(
+    returns_df = (
+        prices_df
+        .withColumn(
+            "previous_close",
+            lag("close").over(window_spec)
+        )
+        .withColumn(
+            "daily_return_pct",
             (
-                (F.col("close") - F.col("previous_close"))
-                / F.col("previous_close")
-            ) * 100,
-            4
+                (col("close") - col("previous_close"))
+                / col("previous_close")
+            ) * 100
         )
     )
-)
 
-# COMMAND ----------
+    returns_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/silver/daily_returns")
 
-returns_df = returns_df.filter(
-    F.col("previous_close").isNotNull()
-)
+    print("Daily returns created")
 
-# COMMAND ----------
 
-returns_df = returns_df.select(
-    "ticker",
-    "date",
-    "close",
-    "previous_close",
-    "daily_return_pct"
-)
-
-# COMMAND ----------
-
-returns_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.daily_returns"
-    )
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_silver.daily_returns
-# MAGIC WHERE ticker = 'AAPL'
-# MAGIC ORDER BY date
-# MAGIC LIMIT 10;
+if __name__ == "__main__":
+    run()

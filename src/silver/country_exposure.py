@@ -1,50 +1,51 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import sum, col, round
+
 def run():
-    print("Running country_exposure")
+    spark = get_spark()
 
-# Databricks notebook source
-from pyspark.sql import functions as F
-
-weights_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_weights"
-)
-
-security_df = spark.table(
-    "adb_investment_platform_dev.investment_bronze.security_master"
-)
-
-country_exposure_df = (
-    weights_df.alias("w")
-    .join(
-        security_df.alias("s"),
-        on="ticker",
-        how="inner"
-    )
-    .groupBy(
-        "portfolio_id",
-        "country"
-    )
-    .agg(
-        F.round(
-            F.sum("weight_pct"),
-            2
-        ).alias("country_weight_pct")
-    )
-)
-
-# COMMAND ----------
-
-country_exposure_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.country_exposure"
+    weights_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_weights"
     )
 
-# COMMAND ----------
+    security_df = spark.read.format("delta").load(
+        "/opt/data/bronze/security_master"
+    )
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_silver.country_exposure
+    country_df = (
+        weights_df
+        .join(security_df, "ticker")
+        .groupBy("portfolio_id", "country")
+        .agg(
+            sum("market_value").alias("country_market_value")
+        )
+    )
 
-# COMMAND ----------
+    total_df = (
+        weights_df
+        .groupBy("portfolio_id")
+        .agg(
+            sum("market_value").alias("portfolio_value")
+        )
+    )
 
+    result_df = (
+        country_df
+        .join(total_df, "portfolio_id")
+        .withColumn(
+            "country_weight_pct",
+            round(
+                col("country_market_value")
+                / col("portfolio_value") * 100,
+                2
+            )
+        )
+    )
+
+    result_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/silver/country_exposure")
+
+if __name__ == "__main__":
+    run()
