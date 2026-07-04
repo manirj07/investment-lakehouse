@@ -1,62 +1,46 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import col, round
+
 def run():
-    print("Running performance_attribution")
 
-# Databricks notebook source
-from pyspark.sql import functions as F
+    spark = get_spark()
 
-returns_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.daily_returns"
-)
-
-weights_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_weights"
-)
-
-performance_attribution_df = (
-    returns_df.alias("r")
-    .join(
-        weights_df.select(
-            "portfolio_id",
-            "ticker",
-            "weight_pct"
-        ).alias("w"),
-        on="ticker",
-        how="inner"
+    returns_df = spark.read.format("delta").load(
+        "/opt/data/silver/daily_returns"
     )
-    .withColumn(
-        "contribution_pct",
-        F.round(
-            (
-                F.col("weight_pct")
-                * F.col("daily_return_pct")
-            ) / 100,
-            6
+
+    weights_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_weights"
+    )
+
+    attribution_df = (
+        returns_df
+        .join(
+            weights_df.select(
+                "portfolio_id",
+                "ticker",
+                "weight_pct"
+            ),
+            "ticker"
+        )
+        .withColumn(
+            "contribution_pct",
+            round(
+                (
+                    col("daily_return_pct")
+                    * col("weight_pct")
+                ) / 100,
+                4
+            )
         )
     )
-)
 
-# COMMAND ----------
+    attribution_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save(
+            "/opt/data/silver/performance_attribution"
+        )
 
-performance_attribution_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.performance_attribution"
-    )
-    
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT
-# MAGIC     date,
-# MAGIC     ticker,
-# MAGIC     weight_pct,
-# MAGIC     daily_return_pct,
-# MAGIC     contribution_pct
-# MAGIC FROM adb_investment_platform_dev.investment_silver.performance_attribution
-# MAGIC ORDER BY date
-# MAGIC LIMIT 20;
-
-# COMMAND ----------
-
+if __name__ == "__main__":
+    run()

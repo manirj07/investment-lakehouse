@@ -1,59 +1,62 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import sum, round, col
+
 def run():
-    print("Running sector_exposure")
 
-# Databricks notebook source
-from pyspark.sql import functions as F
+    spark = get_spark()
 
-weights_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_weights"
-)
-
-security_df = spark.table(
-    "adb_investment_platform_dev.investment_bronze.security_master"
-)
-
-# COMMAND ----------
-
-sector_exposure_df = (
-    weights_df.alias("w")
-    .join(
-        security_df.alias("s"),
-        on="ticker",
-        how="inner"
-    )
-)
-
-# COMMAND ----------
-
-sector_exposure_df = (
-    sector_exposure_df
-    .groupBy(
-        "portfolio_id",
-        "sector"
-    )
-    .agg(
-        F.round(
-            F.sum("weight_pct"),
-            2
-        ).alias("sector_weight_pct")
-    )
-)
-
-# COMMAND ----------
-
-sector_exposure_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.sector_exposure"
+    weights_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_weights"
     )
 
-# COMMAND ----------
+    security_df = spark.read.format("delta").load(
+        "/opt/data/bronze/security_master"
+    )
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_silver.sector_exposure
-# MAGIC ORDER BY sector_weight_pct DESC;
+    df = (
+        weights_df
+        .join(security_df, "ticker")
+        .groupBy(
+            "portfolio_id",
+            "sector"
+        )
+        .agg(
+            sum("market_value").alias(
+                "sector_market_value"
+            )
+        )
+    )
 
-# COMMAND ----------
+    total_df = (
+        weights_df
+        .groupBy("portfolio_id")
+        .agg(
+            sum("market_value").alias(
+                "portfolio_value"
+            )
+        )
+    )
 
+    result_df = (
+        df.join(total_df, "portfolio_id")
+        .withColumn(
+            "sector_weight_pct",
+            round(
+                (
+                    col("sector_market_value")
+                    / col("portfolio_value")
+                ) * 100,
+                2
+            )
+        )
+    )
+
+    result_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/silver/sector_exposure")
+
+    print("Sector exposure created")
+
+if __name__ == "__main__":
+    run()

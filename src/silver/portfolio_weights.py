@@ -1,63 +1,44 @@
+from common.spark_session import get_spark
+from pyspark.sql import Window
+from pyspark.sql.functions import sum, col, round
+
 def run():
-    print("Running portfolio_weights")
 
-# Databricks notebook source
-positions_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_positions"
-)
+    spark = get_spark()
 
-# COMMAND ----------
-
-from pyspark.sql import functions as F
-
-portfolio_totals_df = (
-    positions_df
-    .groupBy("portfolio_id")
-    .agg(
-        F.sum("market_value")
-        .alias("portfolio_value")
+    positions_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_positions"
     )
-)
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Calculate Weights
-
-# COMMAND ----------
-
-portfolio_weights_df = (
-    positions_df.alias("p")
-    .join(
-        portfolio_totals_df.alias("t"),
-        on="portfolio_id",
-        how="inner"
+    portfolio_window = Window.partitionBy(
+        "portfolio_id"
     )
-    .withColumn(
-        "weight_pct",
-        F.round(
-            (F.col("market_value") /
-             F.col("portfolio_value")) * 100,
-            2
+
+    weights_df = (
+        positions_df
+        .withColumn(
+            "portfolio_value",
+            sum("market_value").over(portfolio_window)
+        )
+        .withColumn(
+            "weight_pct",
+            (
+                col("market_value")
+                / col("portfolio_value")
+            ) * 100
+        )
+        .withColumn(
+            "weight_pct",
+            round("weight_pct", 2)
         )
     )
-)
 
-# COMMAND ----------
+    weights_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/silver/portfolio_weights")
 
-portfolio_weights_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_silver.portfolio_weights"
-    )
+    print("Portfolio weights created")
 
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT
-# MAGIC     ticker,
-# MAGIC     market_value,
-# MAGIC     weight_pct
-# MAGIC FROM adb_investment_platform_dev.investment_silver.portfolio_weights
-# MAGIC ORDER BY weight_pct DESC;
+if __name__ == "__main__":
+    run()
