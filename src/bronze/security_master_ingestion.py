@@ -1,44 +1,20 @@
+from common.spark_session import get_spark
+
 def run():
-    print("Running security_master_ingestion")
 
-# Databricks notebook source
-security_master = [
-    ("AAPL", "Apple Inc", "Technology", "USA", "USD"),
-    ("MSFT", "Microsoft", "Technology", "USA", "USD"),
-    ("NVDA", "NVIDIA", "Technology", "USA", "USD"),
-    ("SAP", "SAP SE", "Technology", "Germany", "EUR"),
-    ("ALV.DE", "Allianz SE", "Financials", "Germany", "EUR")
-]
+    spark = get_spark()
 
-columns = [
-    "ticker",
-    "security_name",
-    "sector",
-    "country",
-    "currency"
-]
-
-security_master_df = spark.createDataFrame(
-    security_master,
-    columns
-)
-
-display(security_master_df)
-
-# COMMAND ----------
-
-security_master_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_bronze.security_master"
+    df = spark.read.option("header", "true").csv(
+        "/opt/data/source/security_master.csv"
     )
 
-# COMMAND ----------
+    df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/bronze/security_master")
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_bronze.security_master;
+    print("Bronze security master loaded")
 
-# COMMAND ----------
 
+if __name__ == "__main__":
+    run()
