@@ -1,32 +1,20 @@
+from common.spark_session import get_spark
+
+
 def run():
-    print("Running holdings_ingestion")
+    spark = get_spark()
 
-# Databricks notebook source
-holdings = [
-    ("P001", "AAPL", 100),
-    ("P001", "MSFT", 150),
-    ("P001", "NVDA", 75),
-    ("P001", "SAP", 200),
-    ("P001", "ALV.DE", 100)
-]
-columns = [
-    "portfolio_id",
-    "ticker",
-    "shares"
-]
-holdings_df  = spark.createDataFrame(holdings, columns)
-display(holdings_df )
+    df = spark.read.option("header", "true").csv(
+        "/opt/data/source/holdings.csv"
+    )
 
-# COMMAND ----------
+    df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/bronze/holdings")
 
-holdings_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable("adb_investment_platform_dev.investment_bronze.holdings")
+    print("Bronze holdings loaded")
 
-# COMMAND ----------
 
-holdings_df.count()
-
-# COMMAND ----------
-
+if __name__ == "__main__":
+    run()
