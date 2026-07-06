@@ -1,41 +1,27 @@
+from common.spark_session import get_spark
+
+
 def run():
-    print("Running dim_portfolio")
 
-# Databricks notebook source
-portfolio_data = [
-    (
-        1,
-        "P001",
-        "Global Growth Fund",
-        "John Smith"
-    )
-]
+    spark = get_spark()
 
-columns = [
-    "portfolio_key",
-    "portfolio_id",
-    "portfolio_name",
-    "portfolio_manager"
-]
-
-dim_portfolio_df = spark.createDataFrame(
-    portfolio_data,
-    columns
-)
-
-# COMMAND ----------
-
-dim_portfolio_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_gold.dim_portfolio"
+    positions_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_positions"
     )
 
-# COMMAND ----------
+    dim_portfolio_df = (
+        positions_df
+        .select("portfolio_id")
+        .distinct()
+    )
 
-# MAGIC %sql
-# MAGIC SHOW TABLES IN adb_investment_platform_dev.investment_gold;
+    dim_portfolio_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/gold/dim_portfolio")
 
-# COMMAND ----------
+    print("dim_portfolio created")
 
+
+if __name__ == "__main__":
+    run()

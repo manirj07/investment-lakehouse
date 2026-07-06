@@ -1,24 +1,23 @@
+from common.spark_session import get_spark
+
+
 def run():
-    print("Running fact_portfolio_daily_performance")
 
-# Databricks notebook source
-portfolio_daily_performance_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_daily_performance"
-)
+    spark = get_spark()
 
-portfolio_daily_performance_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_gold.fact_portfolio_daily_performance"
+    fact_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_daily_performance"
     )
 
-# COMMAND ----------
+    fact_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save(
+            "/opt/data/gold/fact_portfolio_daily_performance"
+        )
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_gold.fact_portfolio_daily_performance
-# MAGIC LIMIT 10;
+    print("fact_portfolio_daily_performance created")
 
-# COMMAND ----------
 
+if __name__ == "__main__":
+    run()

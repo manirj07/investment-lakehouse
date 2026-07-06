@@ -1,123 +1,50 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import (
+    avg,
+    max,
+    min,
+    round
+)
+
+
 def run():
-    print("Running fact_portfolio_performance")
 
-# Databricks notebook source
+    spark = get_spark()
 
-from pyspark.sql import functions as F
-
-positions_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_positions"
-)
-
-weights_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.portfolio_weights"
-)
-
-dim_security_df = spark.table(
-    "adb_investment_platform_dev.investment_gold.dim_security"
-)
-
-dim_portfolio_df = spark.table(
-    "adb_investment_platform_dev.investment_gold.dim_portfolio"
-)
-
-dim_date_df = spark.table(
-    "adb_investment_platform_dev.investment_gold.dim_date"
-)
-
-
-
-# COMMAND ----------
-
-fact_df = (
-    positions_df.alias("p")
-    .join(
-        weights_df.select(
-            "portfolio_id",
-            "ticker",
-            "weight_pct"
-        ).alias("w"),
-        ["portfolio_id", "ticker"],
-        "inner"
-    )
-)
-
-# COMMAND ----------
-
-fact_df = (
-    fact_df
-    .join(
-        dim_security_df.select(
-            "security_key",
-            "ticker"
-        ),
-        "ticker",
-        "inner"
-    )
-)
-
-# COMMAND ----------
-
-fact_df = (
-    fact_df
-    .join(
-        dim_portfolio_df.select(
-            "portfolio_key",
-            "portfolio_id"
-        ),
-        "portfolio_id",
-        "inner"
-    )
-)
-
-# COMMAND ----------
-
-latest_date = (
-    spark.table(
-        "adb_investment_platform_dev.investment_bronze.market_prices"
-    )
-    .agg(F.max("date").alias("max_date"))
-    .collect()[0]["max_date"]
-)
-
-# COMMAND ----------
-
-date_key = int(
-    latest_date.strftime("%Y%m%d")
-)
-
-# COMMAND ----------
-
-fact_df = fact_df.withColumn(
-    "date_key",
-    F.lit(date_key)
-)
-
-# COMMAND ----------
-
-fact_df = fact_df.select(
-    "date_key",
-    "portfolio_key",
-    "security_key",
-    "shares",
-    "market_value",
-    "weight_pct"
-)
-
-# COMMAND ----------
-
-fact_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_gold.fact_portfolio_performance"
+    daily_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_daily_performance"
     )
 
-# COMMAND ----------
+    summary_df = (
+        daily_df
+        .groupBy("portfolio_id")
+        .agg(
+            round(
+                avg("portfolio_return_pct"),
+                4
+            ).alias("avg_daily_return_pct"),
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_gold.fact_portfolio_performance;
+            round(
+                max("portfolio_return_pct"),
+                4
+            ).alias("best_day_return_pct"),
 
-# COMMAND ----------
+            round(
+                min("portfolio_return_pct"),
+                4
+            ).alias("worst_day_return_pct")
+        )
+    )
 
+    summary_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save(
+            "/opt/data/gold/fact_portfolio_performance"
+        )
+
+    print("fact_portfolio_performance created")
+
+
+if __name__ == "__main__":
+    run()
