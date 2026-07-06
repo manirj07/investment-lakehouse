@@ -3,13 +3,18 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
+
+# -------------------------
 # Bronze
+# -------------------------
 from src.bronze.market_prices_ingestion import run as market_prices_run
 from src.bronze.holdings_ingestion import run as holdings_run
 from src.bronze.security_master_ingestion import run as security_master_run
 from src.bronze.esg_scores_ingestion import run as esg_scores_run
 
+# -------------------------
 # Silver
+# -------------------------
 from src.silver.daily_returns import run as daily_returns_run
 from src.silver.portfolio_positions import run as portfolio_positions_run
 from src.silver.portfolio_weights import run as portfolio_weights_run
@@ -19,27 +24,41 @@ from src.silver.portfolio_daily_performance import run as portfolio_daily_perfor
 from src.silver.performance_attribution import run as performance_attribution_run
 from src.silver.portfolio_esg_score import run as portfolio_esg_score_run
 
-# Gold
+# -------------------------
+# Gold Dimensions
+# -------------------------
 from src.gold.dim_security import run as dim_security_run
 from src.gold.dim_portfolio import run as dim_portfolio_run
 from src.gold.dim_date import run as dim_date_run
+
+# -------------------------
+# Gold Facts
+# -------------------------
 from src.gold.fact_portfolio_performance import run as fact_portfolio_performance_run
 from src.gold.fact_portfolio_daily_performance import run as fact_portfolio_daily_performance_run
 from src.gold.fact_performance_attribution import run as fact_performance_attribution_run
 
+
 default_args = {
     "owner": "maniraj",
-    "retries": 1
+    "depends_on_past": False,
+    "retries": 1,
 }
+
 
 with DAG(
     dag_id="investment_platform_dag",
+    description="Investment Lakehouse Medallion Architecture Pipeline",
     start_date=datetime(2025, 1, 1),
     schedule="@daily",
     catchup=False,
     default_args=default_args,
-    tags=["investment", "lakehouse"],
+    tags=["investment", "lakehouse", "delta", "medallion"],
 ) as dag:
+
+    # =====================================================
+    # BRONZE
+    # =====================================================
 
     market_prices = PythonOperator(
         task_id="market_prices_ingestion",
@@ -60,6 +79,10 @@ with DAG(
         task_id="esg_scores_ingestion",
         python_callable=esg_scores_run,
     )
+
+    # =====================================================
+    # SILVER
+    # =====================================================
 
     daily_returns = PythonOperator(
         task_id="daily_returns",
@@ -101,6 +124,10 @@ with DAG(
         python_callable=portfolio_esg_score_run,
     )
 
+    # =====================================================
+    # GOLD DIMENSIONS
+    # =====================================================
+
     dim_security = PythonOperator(
         task_id="dim_security",
         python_callable=dim_security_run,
@@ -115,6 +142,10 @@ with DAG(
         task_id="dim_date",
         python_callable=dim_date_run,
     )
+
+    # =====================================================
+    # GOLD FACTS
+    # =====================================================
 
     fact_portfolio_performance = PythonOperator(
         task_id="fact_portfolio_performance",
@@ -131,28 +162,42 @@ with DAG(
         python_callable=fact_performance_attribution_run,
     )
 
-    # Bronze
-    market_prices >> holdings >> security_master >> esg_scores
+    # =====================================================
+    # DEPENDENCIES
+    # =====================================================
 
-    # Silver
-    esg_scores >> daily_returns
-    daily_returns >> portfolio_positions
+    # Bronze layer runs in parallel
+    bronze_complete = [
+        market_prices,
+        holdings,
+        security_master,
+        esg_scores,
+    ]
+
+    # Silver core
+    bronze_complete >> daily_returns
+
+    [daily_returns, holdings] >> portfolio_positions
+
     portfolio_positions >> portfolio_weights
 
-    # Parallel Silver
+    # Silver analytics
     portfolio_weights >> sector_exposure
     portfolio_weights >> country_exposure
-    portfolio_weights >> portfolio_daily_performance
+    portfolio_weights >> portfolio_esg_score
 
-    portfolio_daily_performance >> performance_attribution
-    performance_attribution >> portfolio_esg_score
+    [daily_returns, portfolio_weights] >> performance_attribution
 
-    # Gold Dimensions
-    portfolio_esg_score >> dim_security
-    portfolio_esg_score >> dim_portfolio
-    portfolio_esg_score >> dim_date
+    [daily_returns, portfolio_weights] >> portfolio_daily_performance
 
-    # Gold Facts
+    # Gold dimensions
+    portfolio_positions >> dim_security
+    portfolio_positions >> dim_portfolio
+    portfolio_daily_performance >> dim_date
+
+    # Gold facts
+    [dim_security, dim_portfolio, dim_date] >> fact_portfolio_daily_performance
+
+    [dim_security, dim_portfolio, dim_date] >> fact_performance_attribution
+
     [dim_security, dim_portfolio, dim_date] >> fact_portfolio_performance
-    fact_portfolio_performance >> fact_portfolio_daily_performance
-    fact_portfolio_daily_performance >> fact_performance_attribution
