@@ -1,24 +1,23 @@
+from common.spark_session import get_spark
+
+
 def run():
-    print("Running fact_performance_attribution")
 
-# Databricks notebook source
-performance_attribution_df = spark.table(
-    "adb_investment_platform_dev.investment_silver.performance_attribution"
-)
+    spark = get_spark()
 
-performance_attribution_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_gold.fact_performance_attribution"
+    attribution_df = spark.read.format("delta").load(
+        "/opt/data/silver/performance_attribution"
     )
 
-# COMMAND ----------
+    attribution_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save(
+            "/opt/data/gold/fact_performance_attribution"
+        )
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_gold.fact_performance_attribution
-# MAGIC LIMIT 10;
+    print("fact_performance_attribution created")
 
-# COMMAND ----------
 
+if __name__ == "__main__":
+    run()

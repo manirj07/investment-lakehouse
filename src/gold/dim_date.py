@@ -1,58 +1,42 @@
+from common.spark_session import get_spark
+from pyspark.sql.functions import (
+    year,
+    month,
+    quarter,
+    dayofmonth,
+    date_format
+)
+
+
 def run():
-    print("Running dim_date")
 
-# Databricks notebook source
-from pyspark.sql import functions as F
+    spark = get_spark()
 
-date_df = (
-    spark.table(
-        "adb_investment_platform_dev.investment_bronze.market_prices"
-    )
-    .select("date")
-    .distinct()
-)
-
-# COMMAND ----------
-
-dim_date_df = (
-    date_df
-    .withColumn(
-        "date_key",
-        F.date_format("date", "yyyyMMdd").cast("int")
-    )
-    .withColumn(
-        "year",
-        F.year("date")
-    )
-    .withColumn(
-        "quarter",
-        F.quarter("date")
-    )
-    .withColumn(
-        "month",
-        F.month("date")
-    )
-    .withColumn(
-        "month_name",
-        F.date_format("date", "MMMM")
-    )
-)
-
-# COMMAND ----------
-
-dim_date_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .saveAsTable(
-        "adb_investment_platform_dev.investment_gold.dim_date"
+    daily_df = spark.read.format("delta").load(
+        "/opt/data/silver/portfolio_daily_performance"
     )
 
-# COMMAND ----------
+    dim_date_df = (
+        daily_df
+        .select("date")
+        .distinct()
+        .withColumn("year", year("date"))
+        .withColumn("month", month("date"))
+        .withColumn("quarter", quarter("date"))
+        .withColumn("day", dayofmonth("date"))
+        .withColumn(
+            "day_name",
+            date_format("date", "EEEE")
+        )
+    )
 
-# MAGIC %sql
-# MAGIC SELECT *
-# MAGIC FROM adb_investment_platform_dev.investment_gold.dim_date
-# MAGIC LIMIT 10;
+    dim_date_df.write \
+        .format("delta") \
+        .mode("overwrite") \
+        .save("/opt/data/gold/dim_date")
 
-# COMMAND ----------
+    print("dim_date created")
 
+
+if __name__ == "__main__":
+    run()
