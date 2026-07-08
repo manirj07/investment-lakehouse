@@ -7,36 +7,36 @@ from airflow.operators.python import PythonOperator
 # -------------------------
 # Bronze
 # -------------------------
-from src.bronze.market_prices_ingestion import run as market_prices_run
-from src.bronze.holdings_ingestion import run as holdings_run
-from src.bronze.security_master_ingestion import run as security_master_run
-from src.bronze.esg_scores_ingestion import run as esg_scores_run
+from bronze.market_prices_ingestion import run as market_prices_run
+from bronze.holdings_ingestion import run as holdings_run
+from bronze.security_master_ingestion import run as security_master_run
+from bronze.esg_scores_ingestion import run as esg_scores_run
 
 # -------------------------
 # Silver
 # -------------------------
-from src.silver.daily_returns import run as daily_returns_run
-from src.silver.portfolio_positions import run as portfolio_positions_run
-from src.silver.portfolio_weights import run as portfolio_weights_run
-from src.silver.sector_exposure import run as sector_exposure_run
-from src.silver.country_exposure import run as country_exposure_run
-from src.silver.portfolio_daily_performance import run as portfolio_daily_performance_run
-from src.silver.performance_attribution import run as performance_attribution_run
-from src.silver.portfolio_esg_score import run as portfolio_esg_score_run
+from silver.daily_returns import run as daily_returns_run
+from silver.portfolio_positions import run as portfolio_positions_run
+from silver.portfolio_weights import run as portfolio_weights_run
+from silver.sector_exposure import run as sector_exposure_run
+from silver.country_exposure import run as country_exposure_run
+from silver.portfolio_daily_performance import run as portfolio_daily_performance_run
+from silver.performance_attribution import run as performance_attribution_run
+from silver.portfolio_esg_score import run as portfolio_esg_score_run
 
 # -------------------------
 # Gold Dimensions
 # -------------------------
-from src.gold.dim_security import run as dim_security_run
-from src.gold.dim_portfolio import run as dim_portfolio_run
-from src.gold.dim_date import run as dim_date_run
+from gold.dim_security import run as dim_security_run
+from gold.dim_portfolio import run as dim_portfolio_run
+from gold.dim_date import run as dim_date_run
 
 # -------------------------
 # Gold Facts
 # -------------------------
-from src.gold.fact_portfolio_performance import run as fact_portfolio_performance_run
-from src.gold.fact_portfolio_daily_performance import run as fact_portfolio_daily_performance_run
-from src.gold.fact_performance_attribution import run as fact_performance_attribution_run
+from gold.fact_portfolio_performance import run as fact_portfolio_performance_run
+from gold.fact_portfolio_daily_performance import run as fact_portfolio_daily_performance_run
+from gold.fact_performance_attribution import run as fact_performance_attribution_run
 
 
 default_args = {
