@@ -1,7 +1,6 @@
 from common.spark_session import get_spark
 
 def run():
-
     spark = get_spark()
 
     security_df = spark.read.format("delta").load(

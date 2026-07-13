@@ -18,7 +18,12 @@ def get_spark():
         )
     )
 
-    spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    spark = configure_spark_with_delta_pip(
+        builder,
+        extra_packages=[
+            "org.postgresql:postgresql:42.7.4"
+        ]
+    ).getOrCreate()
 
     spark.sparkContext.setLogLevel("WARN")
 
